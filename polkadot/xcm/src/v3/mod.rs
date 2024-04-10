@@ -1466,6 +1466,10 @@ impl<Call> TryFrom<NewInstruction<Call>> for Instruction<Call> {
 				weight_limit,
 				check_origin: check_origin.map(|origin| origin.try_into()).transpose()?,
 			},
+			i => {
+				log::debug!(target: "xcm::v4tov3", "`{i:?}` not supported by v3");
+				return Err(());
+			},
 		})
 	}
 }

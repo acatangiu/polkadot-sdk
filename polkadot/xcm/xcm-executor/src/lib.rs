@@ -78,6 +78,9 @@ pub struct XcmExecutor<Config: config::Config> {
 	appendix_weight: Weight,
 	transact_status: MaybeErrorCode,
 	fees_mode: FeesMode,
+	to_teleport: AssetsInHolding,
+	to_reserve_transfer: AssetsInHolding,
+	to_reserve_withdraw: AssetsInHolding,
 	_config: PhantomData<Config>,
 }
 
@@ -294,6 +297,9 @@ impl<Config: config::Config> XcmExecutor<Config> {
 			appendix_weight: Weight::zero(),
 			transact_status: Default::default(),
 			fees_mode: FeesMode { jit_withdraw: false },
+			to_teleport: AssetsInHolding::new(),
+			to_reserve_transfer: AssetsInHolding::new(),
+			to_reserve_withdraw: AssetsInHolding::new(),
 			_config: PhantomData,
 		}
 	}
@@ -309,6 +315,10 @@ impl<Config: config::Config> XcmExecutor<Config> {
 
 		let mut weight_used = xcm_weight.saturating_sub(self.total_surplus);
 
+		// move un-transferred assets back into holding to correctly trap them
+		self.holding.subsume_assets(self.to_teleport);
+		self.holding.subsume_assets(self.to_reserve_transfer);
+		self.holding.subsume_assets(self.to_reserve_withdraw);
 		if !self.holding.is_empty() {
 			log::trace!(
 				target: "xcm::post_process",
@@ -648,6 +658,89 @@ impl<Config: config::Config> XcmExecutor<Config> {
 					self.send(dest, Xcm(message), FeeReason::TransferReserveAsset)?;
 					Ok(())
 				})
+			},
+			TeleportTransferAssets(assets) => {
+				self.to_teleport.subsume_assets(self.holding.saturating_take(assets));
+				Ok(())
+			},
+			LocalReserveDepositAssets(assets) => {
+				self.to_reserve_transfer.subsume_assets(self.holding.saturating_take(assets));
+				Ok(())
+			},
+			DestinationReserveWithdrawAssets(assets) => {
+				self.to_reserve_withdraw.subsume_assets(self.holding.saturating_take(assets));
+				Ok(())
+			},
+			ExecuteAssetTransfers { dest, remote_fees, remote_xcm } => {
+				// let old_holding = self.holding.clone();
+				let old_teleport = self.to_teleport.clone();
+				let old_reserve_transfer = self.to_reserve_transfer.clone();
+				let old_reserve_withdraw = self.to_reserve_withdraw.clone();
+				let result = Config::TransactionalProcessor::process(|| {
+					// TODO: first, transfer `remote_fees`
+
+					let mut message = vec![];
+
+					// do the reserve transfers
+					if !self.to_reserve_withdraw.is_empty() {
+						let assets = self.to_reserve_withdraw.saturating_take(Wild(All));
+						for asset in assets.assets_iter() {
+							Config::AssetTransactor::deposit_asset(
+								&asset,
+								&dest,
+								Some(&self.context),
+							)?;
+						}
+						// Note that we pass `None` as `maybe_failed_bin` and drop any assets which
+						// cannot be reanchored  because we have already called `deposit_asset` on
+						// all assets.
+						let reanchored_assets = Self::reanchored(assets, &dest, None);
+						message.push(ReserveAssetDeposited(reanchored_assets));
+					}
+
+					// do the reserve withdrawals
+					if !self.to_reserve_withdraw.is_empty() {
+						// Note that here we are able to place any assets which could not be
+						// reanchored back into Holding.
+						let reanchored_assets = Self::reanchored(
+							self.to_reserve_withdraw.saturating_take(Wild(All)),
+							&dest,
+							Some(&mut self.to_reserve_withdraw),
+						);
+						message.push(WithdrawAsset(reanchored_assets));
+					}
+
+					// do the teleports
+					if !self.to_teleport.is_empty() {
+						// We must do this first in order to resolve wildcards.
+						let assets = self.to_teleport.saturating_take(Wild(All));
+						for asset in assets.assets_iter() {
+							// We should check that the asset can actually be teleported out (for
+							// this to be in error, there would need to be an accounting violation
+							// by ourselves, so it's unlikely, but we don't want to allow that kind
+							// of bug to leak into a trusted chain.
+							Config::AssetTransactor::can_check_out(&dest, &asset, &self.context)?;
+							Config::AssetTransactor::check_out(&dest, &asset, &self.context);
+						}
+						// Note that we pass `None` as `maybe_failed_bin` and drop any assets which
+						// cannot be reanchored  because we have already checked all assets out.
+						let reanchored_assets = Self::reanchored(assets, &dest, None);
+						message.push(ReceiveTeleportedAsset(reanchored_assets));
+					}
+
+					message.push(ClearOrigin);
+					message.extend(remote_xcm.0.into_iter());
+					// TODO: use correct FeeReason
+					self.send(dest.clone(), Xcm(message), FeeReason::InitiateTeleport)?;
+					Ok(())
+				});
+				if Config::TransactionalProcessor::IS_TRANSACTIONAL && result.is_err() {
+					// self.holding = old_holding;
+					self.to_teleport = old_teleport;
+					self.to_reserve_transfer = old_reserve_transfer;
+					self.to_reserve_withdraw = old_reserve_withdraw;
+				}
+				result
 			},
 			ReceiveTeleportedAsset(assets) => {
 				let origin = self.origin_ref().ok_or(XcmError::BadOrigin)?;
