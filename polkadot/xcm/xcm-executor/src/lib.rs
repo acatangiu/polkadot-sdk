@@ -731,6 +731,37 @@ impl<Config: config::Config> XcmExecutor<Config> {
 				let result = Config::TransactionalProcessor::process(|| {
 					let mut message = vec![];
 
+					// We need to transfer the fees and buy execution on remote chain _BEFORE_
+					// transferring the other assets. This is required to satisfy the
+					// `MAX_ASSETS_FOR_BUY_EXECUTION` limit in the `AllowTopLevelPaidExecutionFrom`
+					// barrier.
+					if let Some(fees) = remote_fees {
+						// transfer the fees
+						match (
+							self.to_reserve_transfer.try_take(fees.clone().into()),
+							self.to_reserve_withdraw.try_take(fees.clone().into()),
+							self.to_teleport.try_take(fees.clone().into()),
+						) {
+							(Ok(fees), Err(_), Err(_)) => Self::do_reserve_transfer_assets(
+								fees,
+								&self.context,
+								&dest,
+								&mut message,
+							),
+							(Err(_), Ok(fees), Err(_)) => Self::do_reserve_withdraw_assets(
+								fees,
+								&mut self.to_reserve_withdraw,
+								&dest,
+								&mut message,
+							),
+							(Err(_), Err(_), Ok(fees)) =>
+								Self::do_teleport_assets(fees, &self.context, &dest, &mut message),
+							_ => Err(XcmError::NotHoldingFees),
+						}?;
+						// buy execution
+						message.push(BuyExecution { fees, weight_limit: Unlimited });
+					}
+
 					// add the reserve transfers
 					if !self.to_reserve_transfer.is_empty() {
 						let assets = self.to_reserve_transfer.saturating_take(Wild(All));
