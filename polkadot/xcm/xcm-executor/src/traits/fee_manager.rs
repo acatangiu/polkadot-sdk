@@ -39,6 +39,8 @@ pub enum FeeReason {
 	InitiateReserveWithdraw,
 	/// When the `InitiateTeleport` instruction is called.
 	InitiateTeleport,
+	/// When the `ExecuteAssetTransfers` instruction is called.
+	ExecuteAssetTransfers,
 	/// When the `QueryPallet` instruction is called.
 	QueryPallet,
 	/// When the `ExportMessage` instruction is called (and includes the network ID).

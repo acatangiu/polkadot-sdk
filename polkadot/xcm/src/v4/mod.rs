@@ -1068,7 +1068,7 @@ pub enum Instruction<Call> {
 	/// Kind: *Command*
 	DestinationReserveWithdrawAssets(AssetFilter),
 
-	/// Cross-chain transfer asset(s) in the asset transfers staging registers as follows:
+	/// Cross-chain transfer asset(s) from the asset transfer staging registers as follows:
 	///
 	/// - teleport staging register: burn local assets and append a `ReceiveTeleportedAsset` XCM
 	///   instruction to the XCM program to be sent onward to the `dest` location,
