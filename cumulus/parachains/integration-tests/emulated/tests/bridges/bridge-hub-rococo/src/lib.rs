@@ -37,6 +37,10 @@ mod imports {
 		},
 	};
 	pub use parachains_common::AccountId;
+	pub use penpal_runtime::xcm_config::{
+		LocalTeleportableToAssetHub as PenpalLocalTeleportableToAssetHub,
+		UniversalLocation as PenpalUniversalLocation,
+	};
 	pub use rococo_westend_system_emulated_network::{
 		asset_hub_rococo_emulated_chain::{
 			genesis::ED as ASSET_HUB_ROCOCO_ED, AssetHubRococoParaPallet as AssetHubRococoPallet,

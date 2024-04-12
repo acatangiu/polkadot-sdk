@@ -630,18 +630,15 @@ fn bidirectional_teleport_foreign_asset_between_para_and_asset_hub_using_explici
 fn teleport_assets_destination_reserve_fees_xcm_program(
 	dest: Location,
 	beneficiary: Location,
-	mut assets: Vec<Asset>,
+	all_assets: Vec<Asset>,
 	fee_idx: usize,
 ) -> Xcm<penpal_runtime::RuntimeCall> {
-	// use xcm_emulator::{Get, Parachain};
-	// let context = X1(Parachain(<PenpalA as Parachain>::ParachainInfo::get().into()).into());
-	// let dest_fees = fees.reanchored(&dest, context).unwrap();
+	let mut assets = all_assets.clone();
 	let fees = assets.remove(fee_idx);
 	// xcm to be executed at dest
 	let xcm_on_dest = Xcm(vec![DepositAsset { assets: Wild(All), beneficiary }]);
 	Xcm(vec![
-		WithdrawAsset(fees.clone().into()),
-		WithdrawAsset(assets.clone().into()),
+		WithdrawAsset(all_assets.into()),
 		DestinationReserveWithdrawAssets(fees.clone().into()),
 		TeleportTransferAssets(assets.into()),
 		ExecuteAssetTransfers { dest, remote_fees: Some(fees.into()), remote_xcm: xcm_on_dest },
@@ -667,15 +664,15 @@ fn penpal_to_asset_hub_execute(t: ParaToSystemParaTest) -> DispatchResult {
 fn teleport_assets_local_reserve_fees_xcm_program(
 	dest: Location,
 	beneficiary: Location,
-	mut assets: Vec<Asset>,
+	all_assets: Vec<Asset>,
 	fee_idx: usize,
 ) -> Xcm<penpal_runtime::RuntimeCall> {
+	let mut assets = all_assets.clone();
 	let fees = assets.remove(fee_idx);
 	// xcm to be executed at dest
 	let xcm_on_dest = Xcm(vec![DepositAsset { assets: Wild(All), beneficiary }]);
 	Xcm(vec![
-		WithdrawAsset(fees.clone().into()),
-		WithdrawAsset(assets.clone().into()),
+		WithdrawAsset(all_assets.into()),
 		LocalReserveDepositAssets(fees.clone().into()),
 		TeleportTransferAssets(assets.into()),
 		ExecuteAssetTransfers { dest, remote_fees: Some(fees.into()), remote_xcm: xcm_on_dest },
