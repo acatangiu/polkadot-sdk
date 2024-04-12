@@ -234,4 +234,17 @@ impl<Call> XcmWeightInfo<Call> for PeopleRococoXcmWeight<Call> {
 	fn unpaid_execution(_: &WeightLimit, _: &Option<Location>) -> Weight {
 		XcmGeneric::<Runtime>::unpaid_execution()
 	}
+	// TODO: plug in weights
+	fn teleport_transfer_assets(_: &AssetFilter) -> Weight {
+		Weight::zero()
+	}
+	fn local_reserve_deposit_assets(_: &AssetFilter) -> Weight {
+		Weight::zero()
+	}
+	fn destination_reserve_withdraw_assets(_: &AssetFilter) -> Weight {
+		Weight::zero()
+	}
+	fn execute_asset_transfers(_: &Location, _: &Option<Asset>, _: &Xcm<()>) -> Weight {
+		Weight::zero()
+	}
 }

@@ -361,7 +361,8 @@ impl<Config: config::Config> XcmExecutor<Config> {
 			target: "xcm::send", "Sending msg: {msg:?}, to destination: {dest:?}, (reason: {reason:?})"
 		);
 		let (ticket, fee) = validate_send::<Config::XcmSender>(dest, msg)?;
-		self.take_fee(fee, reason)?;
+		// TODO: handle transport fees
+		// self.take_fee(fee, reason)?;
 		Config::XcmSender::deliver(ticket).map_err(Into::into)
 	}
 
