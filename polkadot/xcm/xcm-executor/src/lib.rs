@@ -469,7 +469,7 @@ impl<Config: config::Config> XcmExecutor<Config> {
 		context: &XcmContext,
 		dest: &Location,
 		remote_xcm: &mut Vec<Instruction<()>>,
-	) -> XcmResult {
+	) -> Result<Assets, XcmError> {
 		for asset in assets.assets_iter() {
 			Config::AssetTransactor::deposit_asset(&asset, dest, Some(context))?;
 		}
@@ -477,9 +477,9 @@ impl<Config: config::Config> XcmExecutor<Config> {
 		// cannot be reanchored, because we have already called `deposit_asset` on
 		// all assets.
 		let reanchored_assets = Self::reanchored(assets, dest, None);
-		remote_xcm.push(ReserveAssetDeposited(reanchored_assets));
+		remote_xcm.push(ReserveAssetDeposited(reanchored_assets.clone()));
 
-		Ok(())
+		Ok(reanchored_assets)
 	}
 
 	fn do_reserve_withdraw_assets(
@@ -487,12 +487,13 @@ impl<Config: config::Config> XcmExecutor<Config> {
 		failed_bin: &mut AssetsInHolding,
 		reserve: &Location,
 		remote_xcm: &mut Vec<Instruction<()>>,
-	) -> XcmResult {
+	) -> Result<Assets, XcmError> {
 		// Note that here we are able to place any assets which could not be
 		// reanchored back into Holding.
 		let reanchored_assets = Self::reanchored(assets, reserve, Some(failed_bin));
-		remote_xcm.push(WithdrawAsset(reanchored_assets));
-		Ok(())
+		remote_xcm.push(WithdrawAsset(reanchored_assets.clone()));
+
+		Ok(reanchored_assets)
 	}
 
 	fn do_teleport_assets(
@@ -500,7 +501,7 @@ impl<Config: config::Config> XcmExecutor<Config> {
 		context: &XcmContext,
 		dest: &Location,
 		remote_xcm: &mut Vec<Instruction<()>>,
-	) -> XcmResult {
+	) -> Result<Assets, XcmError> {
 		for asset in assets.assets_iter() {
 			// We should check that the asset can actually be teleported out (for
 			// this to be in error, there would need to be an accounting violation
@@ -512,9 +513,9 @@ impl<Config: config::Config> XcmExecutor<Config> {
 		// Note that we pass `None` as `maybe_failed_bin` and drop any assets which
 		// cannot be reanchored, because we have already checked all assets out.
 		let reanchored_assets = Self::reanchored(assets, dest, None);
-		remote_xcm.push(ReceiveTeleportedAsset(reanchored_assets));
+		remote_xcm.push(ReceiveTeleportedAsset(reanchored_assets.clone()));
 
-		Ok(())
+		Ok(reanchored_assets)
 	}
 
 	/// Calculates what `local_querier` would be from the perspective of `destination`.
@@ -736,29 +737,52 @@ impl<Config: config::Config> XcmExecutor<Config> {
 					// transferring the other assets. This is required to satisfy the
 					// `MAX_ASSETS_FOR_BUY_EXECUTION` limit in the `AllowTopLevelPaidExecutionFrom`
 					// barrier.
-					if let Some(fees) = remote_fees {
+					if let Some(fees_filter) = remote_fees {
+						let reserve_transfer_fees = self
+							.to_reserve_transfer
+							.try_take(fees_filter.clone().into())
+							.ok()
+							.filter(|fees| !fees.is_empty());
+						let reserve_withdraw_fees = self
+							.to_reserve_withdraw
+							.try_take(fees_filter.clone().into())
+							.ok()
+							.filter(|fees| !fees.is_empty());
+						let teleport_fees = self
+							.to_teleport
+							.try_take(fees_filter.clone().into())
+							.ok()
+							.filter(|fees| !fees.is_empty());
 						// transfer the fees
-						match (
-							self.to_reserve_transfer.try_take(fees.clone().into()),
-							self.to_reserve_withdraw.try_take(fees.clone().into()),
-							self.to_teleport.try_take(fees.clone().into()),
-						) {
-							(Ok(fees), Err(_), Err(_)) => Self::do_reserve_transfer_assets(
-								fees,
-								&self.context,
-								&dest,
-								&mut message,
-							),
-							(Err(_), Ok(fees), Err(_)) => Self::do_reserve_withdraw_assets(
-								fees,
-								&mut self.to_reserve_withdraw,
-								&dest,
-								&mut message,
-							),
-							(Err(_), Err(_), Ok(fees)) =>
-								Self::do_teleport_assets(fees, &self.context, &dest, &mut message),
-							_ => Err(XcmError::NotHoldingFees),
-						}?;
+						let fees =
+							match (reserve_transfer_fees, reserve_withdraw_fees, teleport_fees) {
+								(Some(fees), None, None) => Self::do_reserve_transfer_assets(
+									fees,
+									&self.context,
+									&dest,
+									&mut message,
+								),
+								(None, Some(fees), None) => Self::do_reserve_withdraw_assets(
+									fees,
+									&mut self.to_reserve_withdraw,
+									&dest,
+									&mut message,
+								),
+								(None, None, Some(fees)) => Self::do_teleport_assets(
+									fees,
+									&self.context,
+									&dest,
+									&mut message,
+								),
+								_res => {
+									log::trace!(
+										target: "xcm::process_instruction::ExecuteAssetTransfers",
+										"NotHoldingFees: matched: {_res:?}",
+									);
+									Err(XcmError::NotHoldingFees)
+								},
+							}?;
+						let fees = fees.into_inner().pop().ok_or(XcmError::NotHoldingFees)?;
 						// buy execution
 						message.push(BuyExecution { fees, weight_limit: Unlimited });
 					}

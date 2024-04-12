@@ -1869,15 +1869,15 @@ impl<T: Config> Pallet<T> {
 		if let Some(remote_xcm) = remote_xcm {
 			let (ticket, price) = validate_send::<T::XcmRouter>(dest.clone(), remote_xcm.clone())
 				.map_err(Error::<T>::from)?;
-			if origin != Here.into_location() {
-				Self::charge_fees(origin.clone(), price).map_err(|error| {
-					log::error!(
-						target: "xcm::pallet_xcm::execute_xcm_transfer",
-						"Unable to charge fee with error {:?}", error
-					);
-					Error::<T>::FeesNotMet
-				})?;
-			}
+			// if origin != Here.into_location() {
+			// 	Self::charge_fees(origin.clone(), price).map_err(|error| {
+			// 		log::error!(
+			// 			target: "xcm::pallet_xcm::execute_xcm_transfer",
+			// 			"Unable to charge fee with error {:?}", error
+			// 		);
+			// 		Error::<T>::FeesNotMet
+			// 	})?;
+			// }
 			let message_id = T::XcmRouter::deliver(ticket).map_err(Error::<T>::from)?;
 
 			let e = Event::Sent { origin, destination: dest, message: remote_xcm, message_id };

@@ -1094,7 +1094,7 @@ pub enum Instruction<Call> {
 	/// Kind: *Command*.
 	///
 	/// Errors:
-	ExecuteAssetTransfers { dest: Location, remote_fees: Option<Asset>, remote_xcm: Xcm<()> },
+	ExecuteAssetTransfers { dest: Location, remote_fees: Option<AssetFilter>, remote_xcm: Xcm<()> },
 }
 
 impl<Call> Xcm<Call> {

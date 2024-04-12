@@ -244,7 +244,7 @@ impl<Call> XcmWeightInfo<Call> for PeopleRococoXcmWeight<Call> {
 	fn destination_reserve_withdraw_assets(_: &AssetFilter) -> Weight {
 		Weight::zero()
 	}
-	fn execute_asset_transfers(_: &Location, _: &Option<Asset>, _: &Xcm<()>) -> Weight {
+	fn execute_asset_transfers(_: &Location, _: &Option<AssetFilter>, _: &Xcm<()>) -> Weight {
 		Weight::zero()
 	}
 }
