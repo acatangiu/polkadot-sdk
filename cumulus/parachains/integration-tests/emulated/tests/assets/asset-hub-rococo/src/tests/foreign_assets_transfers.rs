@@ -626,3 +626,87 @@ fn bidirectional_teleport_foreign_asset_between_para_and_asset_hub_using_explici
 		asset_hub_to_para_teleport_foreign_assets,
 	);
 }
+
+fn teleport_assets_destination_reserve_fees_xcm_program(
+	dest: Location,
+	beneficiary: Location,
+	mut assets: Vec<Asset>,
+	fee_idx: usize,
+) -> Xcm<penpal_runtime::RuntimeCall> {
+	// use xcm_emulator::{Get, Parachain};
+	// let context = X1(Parachain(<PenpalA as Parachain>::ParachainInfo::get().into()).into());
+	// let dest_fees = fees.reanchored(&dest, context).unwrap();
+	let fees = assets.remove(fee_idx);
+	// xcm to be executed at dest
+	let xcm_on_dest = Xcm(vec![DepositAsset { assets: Wild(All), beneficiary }]);
+	Xcm(vec![
+		WithdrawAsset(fees.clone().into()),
+		WithdrawAsset(assets.clone().into()),
+		DestinationReserveWithdrawAssets(fees.clone().into()),
+		TeleportTransferAssets(assets.into()),
+		ExecuteAssetTransfers { dest, remote_fees: Some(fees.into()), remote_xcm: xcm_on_dest },
+	])
+}
+
+fn penpal_to_asset_hub_execute(t: ParaToSystemParaTest) -> DispatchResult {
+	let xcm = teleport_assets_destination_reserve_fees_xcm_program(
+		t.args.dest,
+		t.args.beneficiary,
+		t.args.assets.clone().into_inner(),
+		t.args.fee_asset_item as usize,
+	);
+	<PenpalA as PenpalAPallet>::PolkadotXcm::execute(
+		t.signed_origin,
+		bx!(xcm::VersionedXcm::V4(xcm.into())),
+		Weight::MAX,
+	)
+	.unwrap();
+	Ok(())
+}
+
+fn teleport_assets_local_reserve_fees_xcm_program(
+	dest: Location,
+	beneficiary: Location,
+	mut assets: Vec<Asset>,
+	fee_idx: usize,
+) -> Xcm<penpal_runtime::RuntimeCall> {
+	let fees = assets.remove(fee_idx);
+	// xcm to be executed at dest
+	let xcm_on_dest = Xcm(vec![DepositAsset { assets: Wild(All), beneficiary }]);
+	Xcm(vec![
+		WithdrawAsset(fees.clone().into()),
+		WithdrawAsset(assets.clone().into()),
+		LocalReserveDepositAssets(fees.clone().into()),
+		TeleportTransferAssets(assets.into()),
+		ExecuteAssetTransfers { dest, remote_fees: Some(fees.into()), remote_xcm: xcm_on_dest },
+	])
+}
+
+fn asset_hub_to_penpal_execute(t: SystemParaToParaTest) -> DispatchResult {
+	let xcm = teleport_assets_local_reserve_fees_xcm_program(
+		t.args.dest,
+		t.args.beneficiary,
+		t.args.assets.clone().into_inner(),
+		t.args.fee_asset_item as usize,
+	);
+	<AssetHubRococo as AssetHubRococoPallet>::PolkadotXcm::execute(
+		t.signed_origin,
+		bx!(xcm::VersionedXcm::V4(xcm.into())),
+		Weight::MAX,
+	)
+	.unwrap();
+	Ok(())
+}
+
+// ==============================================================================================
+// ==== Bidirectional Transfer - Native + Teleportable Foreign Assets - Parachain<->AssetHub ====
+// ==============================================================================================
+/// Transfers of native asset plus teleportable foreign asset from Parachain to AssetHub and back
+/// with fees paid using native asset.
+#[test]
+fn poc_new_instructions_test() {
+	do_bidirectional_teleport_foreign_assets_between_para_and_asset_hub_using_xt(
+		penpal_to_asset_hub_execute,
+		asset_hub_to_penpal_execute,
+	);
+}
