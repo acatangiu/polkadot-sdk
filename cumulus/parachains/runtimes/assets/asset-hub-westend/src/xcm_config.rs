@@ -579,7 +579,8 @@ impl xcm_executor::Config for XcmConfig {
 	// as reserve locations (we trust the Bridge Hub to relay the message that a reserve is being
 	// held). Asset Hub may _act_ as a reserve location for WND and assets created
 	// under `pallet-assets`. Users must use teleport where allowed (e.g. WND with the Relay Chain).
-	type IsReserve = (bridging::to_rococo::IsTrustedBridgedReserveLocationForConcreteAsset,);
+	// type IsReserve = (bridging::to_rococo::IsTrustedBridgedReserveLocationForConcreteAsset,);
+	type IsReserve = Everything;
 	type IsTeleporter = TrustedTeleporters;
 	type UniversalLocation = UniversalLocation;
 	type Barrier = Barrier;
