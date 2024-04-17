@@ -1043,24 +1043,25 @@ pub enum Instruction<Call> {
 	/// Errors: If the given origin is `Some` and not equal to the current Origin register.
 	UnpaidExecution { weight_limit: WeightLimit, check_origin: Option<Location> },
 
-	/// Move the asset(s) (`assets`) from holding to a dedicated assets transfer staging register
-	/// to be then teleported by a subsequent `ExecuteAssetTransfers` instruction.
+	/// Move the asset(s) matching given filter from holding to a dedicated assets transfer staging
+	/// register to be then teleported by a subsequent `ExecuteAssetTransfers` instruction.
 	///
 	/// - `assets`: The asset(s) to move from holding to the teleport staging register.
 	///
 	/// Kind: *Command*
 	TeleportTransferAssets(AssetFilter),
 
-	/// Move the asset(s) (`assets`) from holding to a dedicated assets transfer staging register
-	/// to be then deposited as reserve by a subsequent `ExecuteAssetTransfers` instruction.
+	/// Move the asset(s) matching given filter from holding to a dedicated assets transfer staging
+	/// register to be then deposited as reserve by a subsequent `ExecuteAssetTransfers`
+	/// instruction.
 	///
 	/// - `assets`: The asset(s) to move from holding to the reserve deposit staging register.
 	///
 	/// Kind: *Command*
 	LocalReserveDepositAssets(AssetFilter),
 
-	/// Move the asset(s) (`assets`) from holding to a dedicated assets transfer staging register
-	/// to be then burned and reserved assets released on a remote chain by a subsequent
+	/// Move the asset(s) matching given filter from holding to a dedicated assets transfer staging
+	/// register to be then burned and reserved assets released on a remote chain by a subsequent
 	/// `ExecuteAssetTransfers` instruction.
 	///
 	/// - `assets`: The asset(s) to move from holding to the reserve withdraw staging register.
@@ -1068,7 +1069,7 @@ pub enum Instruction<Call> {
 	/// Kind: *Command*
 	DestinationReserveWithdrawAssets(AssetFilter),
 
-	/// Cross-chain transfer asset(s) from the asset transfer staging registers as follows:
+	/// Cross-chain transfer asset(s) currently in the asset transfer staging registers as follows:
 	///
 	/// - teleport staging register: burn local assets and append a `ReceiveTeleportedAsset` XCM
 	///   instruction to the XCM program to be sent onward to the `dest` location,
@@ -1083,9 +1084,15 @@ pub enum Instruction<Call> {
 	/// The onward XCM is then appended a `ClearOrigin` to allow safe execution of any following
 	/// custom XCM instructions provided in `remote_xcm`.
 	///
+	/// The onward XCM also potentially contains a `BuyExecution` instruction based on the presence
+	/// of the `remote_fees` parameter (see below).
+	///
 	/// Parameters:
 	/// - `dest`: The location of the transfer destination.
-	/// - `remote_fees`: TODO documentation
+	/// - `remote_fees`: If set to `Some(asset_filter)`, the asset matching `asset_filter` in
+	///   either transfer staging register will be transferred first in the `remote_xcm` program,
+	///   followed by a `BuyExecution(asset)`, then rest of transfers follow. This guarantees
+	///   `remote_xcm` will successfully pass a `AllowTopLevelPaidExecutionFrom` barrier.
 	/// - `remote_xcm`: Custom instructions that will be executed on the `dest` chain. Note that
 	///   these instructions will be executed after a `ClearOrigin` so their origin will be `None`.
 	///

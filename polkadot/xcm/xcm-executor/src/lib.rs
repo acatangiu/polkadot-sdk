@@ -738,21 +738,22 @@ impl<Config: config::Config> XcmExecutor<Config> {
 					// `MAX_ASSETS_FOR_BUY_EXECUTION` limit in the `AllowTopLevelPaidExecutionFrom`
 					// barrier.
 					if let Some(fees_filter) = remote_fees {
+						// `fees` has to be single asset
 						let reserve_transfer_fees = self
 							.to_reserve_transfer
 							.try_take(fees_filter.clone().into())
 							.ok()
-							.filter(|fees| !fees.is_empty());
+							.filter(|fees| fees.len() == 1);
 						let reserve_withdraw_fees = self
 							.to_reserve_withdraw
 							.try_take(fees_filter.clone().into())
 							.ok()
-							.filter(|fees| !fees.is_empty());
+							.filter(|fees| fees.len() == 1);
 						let teleport_fees = self
 							.to_teleport
 							.try_take(fees_filter.clone().into())
 							.ok()
-							.filter(|fees| !fees.is_empty());
+							.filter(|fees| fees.len() == 1);
 						// transfer the fees
 						let fees =
 							match (reserve_transfer_fees, reserve_withdraw_fees, teleport_fees) {
@@ -782,6 +783,7 @@ impl<Config: config::Config> XcmExecutor<Config> {
 									Err(XcmError::NotHoldingFees)
 								},
 							}?;
+						// already checked that `fees.len() == 1` above
 						let fees = fees.into_inner().pop().ok_or(XcmError::NotHoldingFees)?;
 						// buy execution
 						message.push(BuyExecution { fees, weight_limit: Unlimited });
