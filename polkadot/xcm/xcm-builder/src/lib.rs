@@ -33,6 +33,8 @@ pub use asset_conversion::{
 	AsPrefixedGeneralIndex, ConvertedConcreteId, MatchedConvertedConcreteId,
 };
 
+mod asset_transfers;
+
 mod barriers;
 pub use barriers::{
 	AllowExplicitUnpaidExecutionFrom, AllowHrmpNotificationsFromRelayChain,
@@ -135,6 +137,7 @@ pub use universal_exports::{
 };
 
 mod weight;
+
 pub use weight::{
 	FixedRateOfFungible, FixedWeightBounds, TakeRevenue, UsingComponents, WeightInfoBounds,
 };
