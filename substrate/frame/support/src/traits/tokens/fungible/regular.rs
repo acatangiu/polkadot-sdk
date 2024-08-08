@@ -573,8 +573,9 @@ impl<AccountId> Unbalanced<AccountId> for () {
 	fn handle_dust(_: Dust<AccountId, Self>) {}
 	fn write_balance(
 		_: &AccountId,
-		_: Self::Balance,
+		amount: Self::Balance,
 	) -> Result<Option<Self::Balance>, DispatchError> {
+		sp_tracing::trace!(target: "xcm::fungible::dummy", ?amount, "write_balance()");
 		Ok(None)
 	}
 	fn set_total_issuance(_: Self::Balance) {}

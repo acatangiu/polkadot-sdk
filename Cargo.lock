@@ -6196,6 +6196,7 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std 14.0.0",
+ "sp-tracing 16.0.0",
  "sp-version",
  "sp-weights",
  "substrate-test-runtime-client",
@@ -9883,6 +9884,7 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std 14.0.0",
+ "sp-tracing 16.0.0",
 ]
 
 [[package]]
@@ -10054,6 +10056,7 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
+ "sp-tracing 16.0.0",
 ]
 
 [[package]]

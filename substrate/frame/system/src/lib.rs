@@ -1547,8 +1547,10 @@ impl<T: Config> Pallet<T> {
 
 	/// Increment the self-sufficient reference counter on an account.
 	pub fn inc_sufficients(who: &T::AccountId) -> IncRefStatus {
+		sp_tracing::trace!(target: "xcm::system", ?who, "inc_sufficients()");
 		Account::<T>::mutate(who, |a| {
-			if a.providers + a.sufficients == 0 {
+			sp_tracing::trace!(target: "xcm::system", ?a, "account info before");
+			let status = if a.providers + a.sufficients == 0 {
 				// Account is being created.
 				a.sufficients = 1;
 				Self::on_created_account(who.clone(), a);
@@ -1556,7 +1558,9 @@ impl<T: Config> Pallet<T> {
 			} else {
 				a.sufficients = a.sufficients.saturating_add(1);
 				IncRefStatus::Existed
-			}
+			};
+			sp_tracing::trace!(target: "xcm::system", ?a, ?status, "account info after");
+			status
 		})
 	}
 
@@ -1678,6 +1682,7 @@ impl<T: Config> Pallet<T> {
 	/// references would not take it above the the maximum.
 	pub fn can_accrue_consumers(who: &T::AccountId, amount: u32) -> bool {
 		let a = Account::<T>::get(who);
+		sp_tracing::trace!(target: "xcm::system", ?who, ?a.providers, "can_accrue_consumers");
 		match a.consumers.checked_add(amount) {
 			Some(c) => a.providers > 0 && c <= T::MaxConsumers::max_consumers(),
 			None => false,
@@ -2060,6 +2065,7 @@ impl<T: Config> Pallet<T> {
 
 	/// An account is being created.
 	pub fn on_created_account(who: T::AccountId, _a: &mut AccountInfo<T::Nonce, T::AccountData>) {
+		sp_tracing::trace!(target: "xcm::system", ?who, "on_created_account");
 		T::OnNewAccount::on_new_account(&who);
 		Self::deposit_event(Event::NewAccount { account: who });
 	}

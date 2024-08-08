@@ -143,10 +143,11 @@ impl<T: Config<I>, I: 'static> fungibles::Unbalanced<T::AccountId> for Pallet<T,
 		defensive!("`decrease_balance` and `increase_balance` have non-default impls; nothing else calls this; qed");
 	}
 	fn write_balance(
-		_: Self::AssetId,
+		asset: Self::AssetId,
 		_: &T::AccountId,
-		_: Self::Balance,
+		amount: Self::Balance,
 	) -> Result<Option<Self::Balance>, DispatchError> {
+		sp_tracing::trace!(target: "xcm::assets::impl_fungibles", ?asset, ?amount, "write_balance()");
 		defensive!("write_balance is not used if other functions are impl'd");
 		Err(DispatchError::Unavailable)
 	}

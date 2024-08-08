@@ -23,6 +23,7 @@ frame-benchmarking = { optional = true, workspace = true }
 frame-support = { workspace = true }
 frame-system = { workspace = true }
 sp-runtime = { workspace = true }
+sp-tracing = { workspace = true }
 docify = { workspace = true }
 
 [dev-dependencies]

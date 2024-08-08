@@ -1296,6 +1296,7 @@ impl<Config: config::Config> XcmExecutor<Config> {
 				Config::AssetTransactor::deposit_asset(&asset, &beneficiary, Some(&self.context));
 			// if deposit failed for asset, mark it for retry after depositing the others.
 			if deposit_result.is_err() {
+				tracing::trace!(target: "xcm::execute", ?deposit_result, "Deposit failed");
 				failed_deposits.push(asset);
 			}
 		}
@@ -1307,6 +1308,7 @@ impl<Config: config::Config> XcmExecutor<Config> {
 			);
 			return deposit_result;
 		}
+		tracing::trace!(target: "xcm::execute", ?failed_deposits, "Deposits to retry");
 
 		// retry previously failed deposits, this time short-circuiting on any error.
 		for asset in failed_deposits {

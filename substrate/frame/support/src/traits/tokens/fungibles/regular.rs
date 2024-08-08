@@ -220,24 +220,31 @@ pub trait Unbalanced<AccountId>: Inspect<AccountId> {
 		amount: Self::Balance,
 		precision: Precision,
 	) -> Result<Self::Balance, DispatchError> {
+		sp_tracing::trace!(target: "xcm::fungibles", ?asset, ?amount, ?precision, "increase_balance()");
 		let old_balance = Self::balance(asset.clone(), who);
+		sp_tracing::trace!(target: "xcm::fungibles", ?old_balance, "increase_balance()");
 		let new_balance = if let BestEffort = precision {
 			old_balance.saturating_add(amount)
 		} else {
 			old_balance.checked_add(&amount).ok_or(ArithmeticError::Overflow)?
 		};
-		if new_balance < Self::minimum_balance(asset.clone()) {
+		let min_balance = Self::minimum_balance(asset.clone());
+		sp_tracing::trace!(target: "xcm::fungibles", ?new_balance, ?min_balance, "increase_balance()");
+		if new_balance < min_balance {
 			// Attempt to increase from 0 to below minimum -> stays at zero.
 			if let BestEffort = precision {
 				Ok(Self::Balance::default())
 			} else {
+				sp_tracing::trace!(target: "xcm::fungibles", ?min_balance, "increase_balance() -> BelowMinimum");
 				Err(TokenError::BelowMinimum.into())
 			}
 		} else {
 			if new_balance == old_balance {
 				Ok(Self::Balance::default())
 			} else {
-				if let Some(dust) = Self::write_balance(asset.clone(), who, new_balance)? {
+				let write_balance_result = Self::write_balance(asset.clone(), who, new_balance);
+				sp_tracing::trace!(target: "xcm::fungibles", ?write_balance_result, "increase_balance()");
+				if let Some(dust) = write_balance_result? {
 					Self::handle_dust(Dust(asset, dust));
 				}
 				Ok(new_balance.saturating_sub(old_balance))
@@ -664,8 +671,9 @@ impl<AccountId> Unbalanced<AccountId> for () {
 	fn write_balance(
 		_: Self::AssetId,
 		_: &AccountId,
-		_: Self::Balance,
+		amount: Self::Balance,
 	) -> Result<Option<Self::Balance>, DispatchError> {
+		sp_tracing::trace!(target: "xcm::fungibles::dummy", ?amount, "write_balance()");
 		Ok(None)
 	}
 	fn set_total_issuance(_: Self::AssetId, _: Self::Balance) {}

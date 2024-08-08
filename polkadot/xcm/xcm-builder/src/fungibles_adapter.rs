@@ -279,10 +279,20 @@ impl<
 		);
 		// Check we handle this asset.
 		let (asset_id, amount) = Matcher::matches_fungibles(what)?;
+		log::trace!(
+			target: "xcm::fungibles_adapter",
+			"asset_id: {:?}, amount: {:?}",
+			asset_id, amount,
+		);
 		let who = AccountIdConverter::convert_location(who)
 			.ok_or(MatchError::AccountIdConversionFailed)?;
-		Assets::mint_into(asset_id, &who, amount)
-			.map_err(|e| XcmError::FailedToTransactAsset(e.into()))?;
+		Assets::mint_into(asset_id, &who, amount).map_err(|e| {
+			log::error!(
+				target: "xcm::fungibles_adapter",
+				"Assets::mint_into failed! error: {:?}", e,
+			);
+			XcmError::FailedToTransactAsset(e.into())
+		})?;
 		Ok(())
 	}
 

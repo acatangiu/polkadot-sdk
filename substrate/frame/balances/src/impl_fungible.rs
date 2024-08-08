@@ -158,6 +158,7 @@ impl<T: Config<I>, I: 'static> fungible::Unbalanced<T::AccountId> for Pallet<T, 
 		who: &T::AccountId,
 		amount: Self::Balance,
 	) -> Result<Option<Self::Balance>, DispatchError> {
+		sp_tracing::trace!(target: "xcm::balances::impl_fungible", ?amount, "write_balance()");
 		let max_reduction =
 			<Self as fungible::Inspect<_>>::reducible_balance(who, Expendable, Force);
 		let (result, maybe_dust) = Self::mutate_account(who, |account| -> DispatchResult {

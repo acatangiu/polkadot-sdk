@@ -69,6 +69,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		d: &mut AssetDetails<T::Balance, T::AccountId, DepositBalanceOf<T, I>>,
 		maybe_deposit: Option<(&T::AccountId, DepositBalanceOf<T, I>)>,
 	) -> Result<ExistenceReasonOf<T, I>, DispatchError> {
+		sp_tracing::trace!(target: "xcm::assets", ?who, "new_account");
 		let accounts = d.accounts.checked_add(1).ok_or(ArithmeticError::Overflow)?;
 		let reason = if let Some((depositor, deposit)) = maybe_deposit {
 			if depositor == who {
@@ -77,6 +78,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 				ExistenceReason::DepositFrom(depositor.clone(), deposit)
 			}
 		} else if d.is_sufficient {
+			sp_tracing::trace!(target: "xcm::assets", ?who, "should inc sufficients for");
 			frame_system::Pallet::<T>::inc_sufficients(who);
 			d.sufficients.saturating_inc();
 			ExistenceReason::Sufficient
@@ -92,6 +94,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			ExistenceReason::Consumer
 		};
 		d.accounts = accounts;
+		sp_tracing::trace!(target: "xcm::assets", ?reason, "new_account OK");
 		Ok(reason)
 	}
 
@@ -129,10 +132,12 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		amount: T::Balance,
 		increase_supply: bool,
 	) -> DepositConsequence {
+		sp_tracing::trace!(target: "xcm::assets", ?id, ?who, ?amount, ?increase_supply, "can_increase()");
 		let details = match Asset::<T, I>::get(&id) {
 			Some(details) => details,
 			None => return DepositConsequence::UnknownAsset,
 		};
+		sp_tracing::trace!(target: "xcm::assets", ?details, "asset details:");
 		if details.status == AssetStatus::Destroying {
 			return DepositConsequence::UnknownAsset
 		}
@@ -147,6 +152,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 				return DepositConsequence::Overflow
 			}
 		} else {
+			sp_tracing::trace!(target: "xcm::assets", "account doesn't hold asset");
 			if amount < details.min_balance {
 				return DepositConsequence::BelowMinimum
 			}
@@ -452,6 +458,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			&mut AssetDetails<T::Balance, T::AccountId, DepositBalanceOf<T, I>>,
 		) -> DispatchResult,
 	) -> DispatchResult {
+		sp_tracing::trace!(target: "xcm::assets", ?id, ?beneficiary, ?amount, "increase_balance()");
 		if amount.is_zero() {
 			return Ok(())
 		}
