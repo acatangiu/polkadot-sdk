@@ -400,6 +400,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			ensure!(caller == depositor || caller == details.admin, Error::<T, I>::NoPermission);
 		}
 		ensure!(account.balance.is_zero(), Error::<T, I>::WouldBurn);
+		// TODO: ensure account.reason
 
 		T::Currency::unreserve(&depositor, deposit);
 
