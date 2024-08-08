@@ -1064,6 +1064,150 @@ fn reserve_transfer_assets_from_para_to_system_para() {
 	assert_eq!(receiver_assets_after, receiver_assets_before + asset_amount_to_send);
 }
 
+/// Reserve Transfers of a random asset and USDT from Parachain to Asset Hub should
+/// work (pay fees with USDT)
+#[test]
+fn reserve_transfer_asset_and_usdt_from_penpal_to_asset_hub() {
+	// Init values for Parachain
+	let destination = PenpalA::sibling_location_of(AssetHubRococo::para_id());
+	let sender = PenpalASender::get();
+	let fee_amount_to_send = ASSET_HUB_ROCOCO_ED * 1000;
+	let asset_amount_to_send = ASSET_HUB_ROCOCO_ED * 1000;
+	let penpal_asset_owner = PenpalAssetOwner::get();
+	let penpal_asset_owner_signer = <PenpalA as Chain>::RuntimeOrigin::signed(penpal_asset_owner);
+	let asset_location_on_penpal = PenpalLocalReservableFromAssetHub::get();
+	let usdt_location_on_penpal = PenpalUsdtFromAssetHub::get();
+	let assets: Assets = vec![
+		(asset_location_on_penpal.clone(), asset_amount_to_send).into(),
+		(usdt_location_on_penpal.clone(), fee_amount_to_send).into(),
+	]
+	.into();
+	let fee_asset_index = assets
+		.inner()
+		.iter()
+		.position(|r| r.id == usdt_location_on_penpal.clone().into())
+		.unwrap() as u32;
+	// Fund Parachain's sender account with some foreign assets
+	PenpalA::mint_foreign_asset(
+		penpal_asset_owner_signer.clone(),
+		asset_location_on_penpal.clone(),
+		sender.clone(),
+		asset_amount_to_send * 2,
+	);
+	// Fund Parachain's sender account with some USDT
+	PenpalA::mint_foreign_asset(
+		penpal_asset_owner_signer.clone(),
+		usdt_location_on_penpal.clone(),
+		sender.clone(),
+		fee_amount_to_send * 2,
+	);
+	// Fund Parachain's sender account with some system assets (for JIT paying local transport fee)
+	PenpalA::mint_foreign_asset(
+		penpal_asset_owner_signer,
+		Parent.into(),
+		sender.clone(),
+		fee_amount_to_send * 100,
+	);
+
+	// Beneficiary is a new (empty) account
+	let receiver = get_account_id_from_seed::<sp_runtime::testing::sr25519::Public>(DUMMY_EMPTY);
+	// Init values for System Parachain
+	let penpal_location_as_seen_by_ahr = AssetHubRococo::sibling_location_of(PenpalA::para_id());
+	let sov_penpal_on_ahr = AssetHubRococo::sovereign_account_id_of(penpal_location_as_seen_by_ahr);
+	let ah_asset_owner = AssetHubRococoAssetOwner::get();
+	let ah_asset_owner_signer = <AssetHubRococo as Chain>::RuntimeOrigin::signed(ah_asset_owner);
+
+	// Fund SA-of-Penpal-on-AHR to be able to pay for the fees.
+	AssetHubRococo::fund_accounts(vec![(
+		sov_penpal_on_ahr.clone().into(),
+		ASSET_HUB_ROCOCO_ED * 1000,
+	)]);
+	// Fund SA-of-Penpal-on-AHR to be able to pay for the sent amount.
+	AssetHubRococo::mint_asset(
+		ah_asset_owner_signer.clone(),
+		USDT_ID,
+		sov_penpal_on_ahr.clone(),
+		asset_amount_to_send * 2,
+	);
+	// Fund SA-of-Penpal-on-AHR to be able to pay for the sent amount.
+	AssetHubRococo::mint_asset(
+		ah_asset_owner_signer,
+		RESERVABLE_ASSET_ID,
+		sov_penpal_on_ahr,
+		asset_amount_to_send * 2,
+	);
+
+	// Init Test
+	let para_test_args = TestContext {
+		sender: sender.clone(),
+		receiver: receiver.clone(),
+		args: TestArgs::new_para(
+			destination,
+			receiver.clone(),
+			asset_amount_to_send,
+			assets,
+			None,
+			fee_asset_index,
+		),
+	};
+	let mut test = ParaToSystemParaTest::new(para_test_args);
+
+	// Query initial balances
+	let (sender_usdt_before, sender_foreign_assets_before) = PenpalA::execute_with(|| {
+		type ForeignAssets = <PenpalA as PenpalAPallet>::ForeignAssets;
+		(
+			ForeignAssets::balance(usdt_location_on_penpal.clone(), &sender),
+			<ForeignAssets>::balance(asset_location_on_penpal.clone(), &sender),
+		)
+	});
+	let (receiver_usdt_before, receiver_assets_before) = AssetHubRococo::execute_with(|| {
+		type Assets = <AssetHubRococo as AssetHubRococoPallet>::Assets;
+		(<Assets>::balance(USDT_ID, &receiver), <Assets>::balance(RESERVABLE_ASSET_ID, &receiver))
+	});
+
+	let receiver_balance_before = test.receiver.balance;
+	println!(
+		"🤡 receiver before: DOT {:?}, USDT {:?}, ASSET {:?}",
+		receiver_balance_before, receiver_usdt_before, receiver_assets_before,
+	);
+
+	// Set assertions and dispatchables
+	test.set_dispatchable::<PenpalA>(para_to_system_para_reserve_transfer_assets);
+	test.assert();
+
+	// Query final balances
+	let (sender_usdt_after, sender_foreign_assets_after) = PenpalA::execute_with(|| {
+		type ForeignAssets = <PenpalA as PenpalAPallet>::ForeignAssets;
+		(
+			<ForeignAssets>::balance(usdt_location_on_penpal.clone(), &sender),
+			<ForeignAssets>::balance(asset_location_on_penpal.clone(), &sender),
+		)
+	});
+	let (receiver_usdt_after, receiver_assets_after) = AssetHubRococo::execute_with(|| {
+		type Assets = <AssetHubRococo as AssetHubRococoPallet>::Assets;
+		(<Assets>::balance(USDT_ID, &receiver), <Assets>::balance(RESERVABLE_ASSET_ID, &receiver))
+	});
+
+	let receiver_balance_after = test.receiver.balance;
+	println!(
+		"🤡 receiver before: DOT {:?}, USDT {:?}, ASSET {:?}",
+		receiver_balance_after, receiver_usdt_after, receiver_assets_after,
+	);
+	// Sender's USDT balance is reduced
+	assert!(sender_usdt_after < sender_usdt_before);
+	// Receiver's balance is increased
+	assert!(receiver_usdt_after > receiver_usdt_before);
+	// Receiver's balance increased by `amount_to_send - delivery_fees - bought_execution`;
+	// `delivery_fees` might be paid from transfer or JIT, also `bought_execution` is unknown but
+	// should be non-zero
+	assert!(receiver_usdt_after < receiver_usdt_before + fee_amount_to_send);
+
+	// Sender's asset balance is reduced by exact amount
+	assert_eq!(sender_foreign_assets_before - asset_amount_to_send, sender_foreign_assets_after);
+	// Receiver's foreign asset balance is increased by exact amount
+	assert_eq!(receiver_assets_after, receiver_assets_before + asset_amount_to_send);
+}
+
 // =========================================================================
 // ===== Reserve Transfers - Native Asset - Parachain<>Relay<>Parachain ====
 // =========================================================================

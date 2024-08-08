@@ -35,7 +35,8 @@ mod imports {
 	// Cumulus
 	pub use asset_test_utils::xcm_helpers;
 	pub use emulated_integration_tests_common::{
-		test_parachain_is_trusted_teleporter,
+		accounts::DUMMY_EMPTY,
+		get_account_id_from_seed, test_parachain_is_trusted_teleporter,
 		xcm_emulator::{
 			assert_expected_events, bx, Chain, Parachain as Para, RelayChain as Relay, Test,
 			TestArgs, TestContext, TestExt,
@@ -43,7 +44,7 @@ mod imports {
 		xcm_helpers::{
 			get_amount_from_versioned_assets, non_fee_asset, xcm_transact_paid_execution,
 		},
-		ASSETS_PALLET_ID, RESERVABLE_ASSET_ID, XCM_V3,
+		ASSETS_PALLET_ID, RESERVABLE_ASSET_ID, USDT_ID, XCM_V3,
 	};
 	pub use parachains_common::Balance;
 	pub use rococo_system_emulated_network::{
@@ -64,6 +65,7 @@ mod imports {
 				CustomizableAssetFromSystemAssetHub as PenpalCustomizableAssetFromSystemAssetHub,
 				LocalReservableFromAssetHub as PenpalLocalReservableFromAssetHub,
 				LocalTeleportableToAssetHub as PenpalLocalTeleportableToAssetHub,
+				UsdtFromAssetHub as PenpalUsdtFromAssetHub,
 			},
 			PenpalAParaPallet as PenpalAPallet, PenpalAssetOwner,
 			PenpalBParaPallet as PenpalBPallet, ED as PENPAL_ED,
