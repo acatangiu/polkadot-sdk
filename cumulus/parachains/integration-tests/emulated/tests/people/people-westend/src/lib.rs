@@ -15,13 +15,9 @@
 
 #[cfg(test)]
 mod imports {
-	pub use codec::Encode;
 	// Substrate
 	pub use frame_support::{
-		assert_ok,
-		pallet_prelude::Weight,
-		sp_runtime::{AccountId32, DispatchResult},
-		traits::fungibles::Inspect,
+		assert_ok, pallet_prelude::Weight, sp_runtime::DispatchResult, traits::fungibles::Inspect,
 	};
 
 	// Polkadot
@@ -37,20 +33,14 @@ mod imports {
 	pub use westend_system_emulated_network::{
 		self,
 		people_westend_emulated_chain::{
-			genesis::ED as PEOPLE_WESTEND_ED,
 			people_westend_runtime::{
-				people, xcm_config::XcmConfig as PeopleWestendXcmConfig,
-				ExistentialDeposit as PeopleWestendExistentialDeposit, Runtime as PeopleRuntime,
+				xcm_config::XcmConfig as PeopleWestendXcmConfig,
+				ExistentialDeposit as PeopleWestendExistentialDeposit,
 			},
 			PeopleWestendParaPallet as PeopleWestendPallet,
 		},
 		westend_emulated_chain::{
-			genesis::ED as WESTEND_ED,
-			westend_runtime::{
-				xcm_config::XcmConfig as WestendXcmConfig, BasicDeposit, ByteDeposit,
-				MaxAdditionalFields, MaxSubAccounts, Runtime as WestendRuntime,
-				RuntimeOrigin as WestendOrigin, SubAccountDeposit,
-			},
+			genesis::ED as WESTEND_ED, westend_runtime::xcm_config::XcmConfig as WestendXcmConfig,
 			WestendRelayPallet as WestendPallet,
 		},
 		PeopleWestendPara as PeopleWestend, PeopleWestendParaReceiver as PeopleWestendReceiver,
@@ -58,7 +48,6 @@ mod imports {
 		WestendRelayReceiver as WestendReceiver, WestendRelaySender as WestendSender,
 	};
 
-	pub type RelayToSystemParaTest = Test<Westend, PeopleWestend>;
 	pub type SystemParaToRelayTest = Test<PeopleWestend, Westend>;
 }
 
