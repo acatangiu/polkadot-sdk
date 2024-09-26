@@ -25,19 +25,18 @@ use crate::{
 	mock::runtime_api::session_info_for_peers,
 	NODE_UNDER_TEST,
 };
+use codec::Encode;
 use futures::SinkExt;
 use itertools::Itertools;
-use parity_scale_codec::Encode;
-use polkadot_node_core_approval_voting::{
-	criteria::{compute_assignments, Config},
-	time::tranche_to_tick,
-};
+use polkadot_node_core_approval_voting::criteria::{compute_assignments, Config};
+
 use polkadot_node_network_protocol::{
 	grid_topology::{GridNeighbors, RandomRouting, RequiredRouting, SessionGridTopology},
 	v3 as protocol_v3,
 };
 use polkadot_node_primitives::approval::{
 	self,
+	time::tranche_to_tick,
 	v2::{CoreBitfield, IndirectAssignmentCertV2, IndirectSignedApprovalVoteV2},
 };
 use polkadot_primitives::{

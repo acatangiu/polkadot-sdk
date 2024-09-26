@@ -1,12 +1,12 @@
 // Copyright (C) Parity Technologies (UK) Ltd.
 // This file is part of Polkadot.
 
-// Substrate is free software: you can redistribute it and/or modify
+// Polkadot is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-// Substrate is distributed in the hope that it will be useful,
+// Polkadot is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
@@ -28,12 +28,12 @@ use super::v4::{
 use crate::DoubleEncoded;
 use alloc::{vec, vec::Vec};
 use bounded_collections::{parameter_types, BoundedVec};
-use core::{fmt::Debug, result};
-use derivative::Derivative;
-use parity_scale_codec::{
+use codec::{
 	self, decode_vec_with_len, Compact, Decode, Encode, Error as CodecError, Input as CodecInput,
 	MaxEncodedLen,
 };
+use core::{fmt::Debug, result};
+use derivative::Derivative;
 use scale_info::TypeInfo;
 
 mod junction;
