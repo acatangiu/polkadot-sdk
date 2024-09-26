@@ -401,7 +401,7 @@ impl<Config: config::Config> XcmExecutor<Config> {
 			reason = ?reason,
 			"Sending msg",
 		);
-		let (ticket, fee) = validate_send::<Config::XcmSender>(dest, msg)?;
+		let (ticket, _fee) = validate_send::<Config::XcmSender>(dest, msg)?;
 		// TODO: handle transport fees
 		// self.take_fee(fee, reason)?;
 		Config::XcmSender::deliver(ticket).map_err(Into::into)
@@ -902,10 +902,10 @@ impl<Config: config::Config> XcmExecutor<Config> {
 									&mut message,
 								),
 								_res => {
-									log::trace!(
-										target: "xcm::process_instruction::ExecuteAssetTransfers",
-										"NotHoldingFees: matched: {_res:?}",
-									);
+									// log::trace!(
+									//	target: "xcm::process_instruction::ExecuteAssetTransfers",
+									//	"NotHoldingFees: matched: {_res:?}",
+									// );
 									Err(XcmError::NotHoldingFees)
 								},
 							}?;
@@ -1133,7 +1133,7 @@ impl<Config: config::Config> XcmExecutor<Config> {
 			DepositReserveAsset { assets, dest, xcm } => {
 				let old_holding = self.holding.clone();
 				let result = Config::TransactionalProcessor::process(|| {
-					let mut message = Vec::with_capacity(xcm.len() + 2);
+					// let mut message = Vec::with_capacity(xcm.len() + 2);
 					// we need to do this take/put cycle to solve wildcards and get exact assets to
 					// be weighed
 					let to_weigh = self.holding.saturating_take(assets.clone());
@@ -1216,7 +1216,7 @@ impl<Config: config::Config> XcmExecutor<Config> {
 			InitiateTeleport { assets, dest, xcm } => {
 				let old_holding = self.holding.clone();
 				let result = Config::TransactionalProcessor::process(|| {
-					let mut message = Vec::with_capacity(xcm.len() + 2);
+					// let mut message = Vec::with_capacity(xcm.len() + 2);
 					let assets = self.holding.saturating_take(assets);
 					// Must ensure that we have teleport trust with destination for these assets.
 					#[cfg(not(feature = "runtime-benchmarks"))]

@@ -2216,7 +2216,6 @@ dependencies = [
  "pallet-xcm-bridge-hub",
  "parachains-common",
  "parity-scale-codec",
- "penpal-runtime",
  "rococo-system-emulated-network",
  "rococo-westend-system-emulated-network",
  "scale-info",
