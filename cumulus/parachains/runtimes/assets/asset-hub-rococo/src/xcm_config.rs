@@ -358,12 +358,8 @@ impl xcm_executor::Config for XcmConfig {
 	// Asset Hub trusts only particular, pre-configured bridged locations from a different consensus
 	// as reserve locations (we trust the Bridge Hub to relay the message that a reserve is being
 	// held). On Rococo Asset Hub, we allow Westend Asset Hub to act as reserve for any asset native
-	// to the Westend ecosystem. We also allow Ethereum contracts to act as reserves for the foreign
-	// assets identified by the same respective contracts locations.
-	type IsReserve = (
-		bridging::to_westend::WestendAssetFromAssetHubWestend,
-		bridging::to_ethereum::IsTrustedBridgedReserveLocationForForeignAsset,
-	);
+	// to the Westend or Ethereum ecosystems.
+	type IsReserve = (bridging::to_westend::WestendOrEthereumAssetFromAssetHubWestend,);
 	type IsTeleporter = TrustedTeleporters;
 	type UniversalLocation = UniversalLocation;
 	type Barrier = Barrier;
@@ -589,8 +585,10 @@ pub mod bridging {
 			);
 
 			pub const WestendNetwork: NetworkId = NetworkId::Westend;
+			pub const EthereumNetwork: NetworkId = NetworkId::Ethereum { chain_id: 11155111 };
 			pub WestendEcosystem: Location = Location::new(2, [GlobalConsensus(WestendNetwork::get())]);
 			pub WndLocation: Location = Location::new(2, [GlobalConsensus(WestendNetwork::get())]);
+			pub EthereumEcosystem: Location = Location::new(2, [GlobalConsensus(EthereumNetwork::get())]);
 			pub AssetHubWestend: Location = Location::new(2, [
 				GlobalConsensus(WestendNetwork::get()),
 				Parachain(bp_asset_hub_westend::ASSET_HUB_WESTEND_PARACHAIN_ID)
@@ -627,9 +625,12 @@ pub mod bridging {
 			}
 		}
 
-		/// Allow any asset native to the Westend ecosystem if it comes from Westend Asset Hub.
-		pub type WestendAssetFromAssetHubWestend =
-			matching::RemoteAssetFromLocation<StartsWith<WestendEcosystem>, AssetHubWestend>;
+		/// Allow any asset native to the Westend or Ethereum ecosystems if it comes from Westend
+		/// Asset Hub.
+		pub type WestendAssetFromAssetHubWestend = matching::RemoteAssetFromLocation<
+			(StartsWith<WestendEcosystem>, StartsWith<EthereumEcosystem>),
+			AssetHubWestend,
+		>;
 	}
 
 	pub mod to_ethereum {

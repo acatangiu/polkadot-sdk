@@ -381,9 +381,10 @@ impl xcm_executor::Config for XcmConfig {
 	// Asset Hub trusts only particular, pre-configured bridged locations from a different consensus
 	// as reserve locations (we trust the Bridge Hub to relay the message that a reserve is being
 	// held). On Westend Asset Hub, we allow Rococo Asset Hub to act as reserve for any asset native
-	// to the Rococo or Ethereum ecosystems.
+	// to the Rococo ecosystem. We also allow Ethereum contracts to act as reserves for the foreign
+	// assets identified by the same respective contracts locations.
 	type IsReserve = (
-		bridging::to_rococo::RococoOrEthereumAssetFromAssetHubRococo,
+		bridging::to_rococo::RococoAssetFromAssetHubRococo,
 		bridging::to_ethereum::IsTrustedBridgedReserveLocationForForeignAsset,
 	);
 	type IsTeleporter = TrustedTeleporters;
@@ -604,10 +605,8 @@ pub mod bridging {
 			);
 
 			pub const RococoNetwork: NetworkId = NetworkId::Rococo;
-			pub const EthereumNetwork: NetworkId = NetworkId::Ethereum { chain_id: 11155111 };
 			pub RococoEcosystem: Location = Location::new(2, [GlobalConsensus(RococoNetwork::get())]);
 			pub RocLocation: Location = Location::new(2, [GlobalConsensus(RococoNetwork::get())]);
-			pub EthereumEcosystem: Location = Location::new(2, [GlobalConsensus(EthereumNetwork::get())]);
 			pub AssetHubRococo: Location = Location::new(2, [
 				GlobalConsensus(RococoNetwork::get()),
 				Parachain(bp_asset_hub_rococo::ASSET_HUB_ROCOCO_PARACHAIN_ID)
@@ -644,12 +643,9 @@ pub mod bridging {
 			}
 		}
 
-		/// Allow any asset native to the Rococo or Ethereum ecosystems if it comes from Rococo
-		/// Asset Hub.
-		pub type RococoOrEthereumAssetFromAssetHubRococo = matching::RemoteAssetFromLocation<
-			(StartsWith<RococoEcosystem>, StartsWith<EthereumEcosystem>),
-			AssetHubRococo,
-		>;
+		/// Allow any asset native to the Rococo ecosystem if it comes from Rococo Asset Hub.
+		pub type RococoOrEthereumAssetFromAssetHubRococo =
+			matching::RemoteAssetFromLocation<StartsWith<RococoEcosystem>, AssetHubRococo>;
 	}
 
 	pub mod to_ethereum {
