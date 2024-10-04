@@ -1089,10 +1089,11 @@ pub enum Instruction<Call> {
 	///
 	/// Safety: No concerns.
 	///
-	/// Kind: *Command*.
+	/// Kind: *Command*.InitiateTransfer
 	InitiateTransfer {
 		destination: Location,
 		remote_fees: Option<AssetTransferFilter>,
+		preserve_origin: bool,
 		assets: Vec<AssetTransferFilter>,
 		remote_xcm: Xcm<()>,
 	},
@@ -1174,8 +1175,8 @@ impl<Call> Instruction<Call> {
 			UnpaidExecution { weight_limit, check_origin } =>
 				UnpaidExecution { weight_limit, check_origin },
 			PayFees { asset } => PayFees { asset },
-			InitiateTransfer { destination, remote_fees, assets, remote_xcm } =>
-				InitiateTransfer { destination, remote_fees, assets, remote_xcm },
+			InitiateTransfer { destination, remote_fees, preserve_origin, assets, remote_xcm } =>
+				InitiateTransfer { destination, remote_fees, preserve_origin, assets, remote_xcm },
 		}
 	}
 }
@@ -1246,8 +1247,8 @@ impl<Call, W: XcmWeightInfo<Call>> GetWeight<W> for Instruction<Call> {
 			UnpaidExecution { weight_limit, check_origin } =>
 				W::unpaid_execution(weight_limit, check_origin),
 			PayFees { asset } => W::pay_fees(asset),
-			InitiateTransfer { destination, remote_fees, assets, remote_xcm } =>
-				W::initiate_transfer(destination, remote_fees, assets, remote_xcm),
+			InitiateTransfer { destination, remote_fees, preserve_origin, assets, remote_xcm } =>
+				W::initiate_transfer(destination, remote_fees, preserve_origin, assets, remote_xcm),
 		}
 	}
 }
