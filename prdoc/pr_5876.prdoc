@@ -1,0 +1,22 @@
+# Schema: Polkadot SDK PRDoc Schema (prdoc) v1.0.0
+# See doc at https://raw.githubusercontent.com/paritytech/polkadot-sdk/master/prdoc/schema_user.json
+
+title: "implement RFC#100: add new InitiateTransfer instruction"
+
+doc:
+  - audience: Runtime User
+    description: |
+      A new instruction InitiateTransfer is introduced that initiates an assets transfer
+      from the chain it is executed on, to another chain. The executed transfer is
+      point-to-point (chain-to-chain) with all of the transfer properties specified in the
+      instruction parameters. The instruction also allows specifying another XCM program to
+      be executed on the remote chain.
+      If a transfer requires going through multiple hops, an XCM program can compose this
+      instruction to be used at every chain along the path, on each hop describing that
+      specific leg of the transfer.
+
+crates:
+  - name: staging-xcm
+    bump: major
+  - name: staging-xcm-executor
+    bump: major
