@@ -26,7 +26,10 @@ mod imports {
 	};
 
 	// Polkadot
-	pub use xcm::prelude::{AccountId32 as AccountId32Junction, *};
+	pub use xcm::{
+		latest::AssetTransferFilter,
+		prelude::{AccountId32 as AccountId32Junction, *},
+	};
 	pub use xcm_executor::traits::TransferType;
 
 	// Cumulus
@@ -65,6 +68,7 @@ mod imports {
 				CustomizableAssetFromSystemAssetHub as PenpalCustomizableAssetFromSystemAssetHub,
 				LocalReservableFromAssetHub as PenpalLocalReservableFromAssetHub,
 				LocalTeleportableToAssetHub as PenpalLocalTeleportableToAssetHub,
+				UniversalLocation as PenpalUniversalLocation,
 				UsdtFromAssetHub as PenpalUsdtFromAssetHub,
 			},
 			PenpalAParaPallet as PenpalAPallet, PenpalAssetOwner,
@@ -84,7 +88,8 @@ mod imports {
 		BridgeHubWestendParaReceiver as BridgeHubWestendReceiver,
 		CollectivesWestendPara as CollectivesWestend, PenpalAPara as PenpalA,
 		PenpalAParaReceiver as PenpalAReceiver, PenpalAParaSender as PenpalASender,
-		PenpalBPara as PenpalB, PenpalBParaReceiver as PenpalBReceiver, WestendRelay as Westend,
+		PenpalBPara as PenpalB, PenpalBParaReceiver as PenpalBReceiver,
+		PenpalBParaSender as PenpalBSender, WestendRelay as Westend,
 		WestendRelayReceiver as WestendReceiver, WestendRelaySender as WestendSender,
 	};
 
