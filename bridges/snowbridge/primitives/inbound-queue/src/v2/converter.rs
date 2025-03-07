@@ -8,7 +8,6 @@ use codec::{Decode, DecodeLimit, Encode};
 use core::marker::PhantomData;
 use snowbridge_core::TokenId;
 use sp_core::{Get, RuntimeDebug, H160};
-use sp_io::hashing::blake2_256;
 use sp_runtime::{traits::MaybeEquivalence, MultiAddress};
 use sp_std::prelude::*;
 use xcm::{
@@ -17,9 +16,6 @@ use xcm::{
 };
 
 const MINIMUM_DEPOSIT: u128 = 1;
-
-/// Topic prefix used for generating unique identifiers for messages
-const INBOUND_QUEUE_TOPIC_PREFIX: &str = "SnowbridgeInboundQueueV2";
 
 /// Representation of an intermediate parsed message, before final conversion to XCM.
 #[derive(Clone, RuntimeDebug)]
@@ -34,8 +30,6 @@ pub struct PreparedMessage {
 	pub remote_xcm: Xcm<()>,
 	/// Fee in Ether to cover the xcm execution on AH.
 	pub execution_fee: Asset,
-	/// Topic for tracking and identification that is derived from message nonce
-	pub topic: [u8; 32],
 }
 
 /// An asset transfer instruction
@@ -151,15 +145,12 @@ where
 			}
 		}
 
-		let topic = blake2_256(&(INBOUND_QUEUE_TOPIC_PREFIX, message.nonce).encode());
-
 		let prepared_message = PreparedMessage {
 			origin: message.origin.clone(),
 			claimer,
 			assets,
 			remote_xcm,
 			execution_fee: execution_fee_asset,
-			topic,
 		};
 
 		Ok(prepared_message)
@@ -345,14 +336,6 @@ where
 
 		// Add the XCM sent in the message to the end of the xcm instruction
 		instructions.extend(message.remote_xcm.0);
-		instructions.push(RefundSurplus);
-		// Refund excess fees to the claimer
-		instructions.push(DepositAsset {
-			assets: Wild(AllOf { id: message.execution_fee.id, fun: WildFungible }),
-			beneficiary: claimer,
-		});
-		instructions.push(SetTopic(message.topic));
-
 		Ok(instructions.into())
 	}
 }
@@ -561,10 +544,8 @@ mod tests {
 		assert!(reserve_deposited_found == 2);
 		// Expecting one WithdrawAsset for the foreign ERC-20
 		assert!(withdraw_assets_found == 1);
-		// Appended to the message in the converter.
-		assert!(refund_surplus_found == 1);
-		// Deposit asset added by the converter and user
-		assert!(deposit_asset_found == 2);
+		// Deposit asset added by the user
+		assert!(deposit_asset_found == 1);
 	}
 
 	#[test]
@@ -719,33 +700,6 @@ mod tests {
 		assert_eq!(
 			actual_claimer,
 			Some(Location::new(0, [AccountId32 { network: None, id: bridge_owner }]))
-		);
-
-		// Find the last two instructions to check the appendix is correct.
-		let mut second_last = None;
-		let mut last = None;
-
-		for instruction in xcm.into_iter() {
-			second_last = last;
-			last = Some(instruction);
-		}
-
-		// Check if both instructions are found
-		assert!(last.is_some());
-		assert!(second_last.is_some());
-
-		let fee_asset = Location::new(2, [GlobalConsensus(EthereumNetwork::get())]);
-		assert_eq!(
-			second_last,
-			Some(DepositAsset {
-				assets: Wild(AllOf { id: AssetId(fee_asset), fun: WildFungibility::Fungible }),
-				// beneficiary is the claimer (bridge owner)
-				beneficiary: Location::new(0, [AccountId32 { network: None, id: bridge_owner }])
-			})
-		);
-		assert_eq!(
-			last,
-			Some(SetTopic(blake2_256(&(INBOUND_QUEUE_TOPIC_PREFIX, message.nonce).encode())))
 		);
 	}
 
