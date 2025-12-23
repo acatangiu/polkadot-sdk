@@ -680,8 +680,8 @@ impl<
 {
 	fn handle(asset: AssetKind, amount: Balance) {
 		match Criterion::convert(asset) {
-			Left(()) => Left::handle(amount),
-			Right(a) => Right::handle(a, amount),
+			Either::Left(()) => Left::handle(amount),
+			Either::Right(a) => Right::handle(a, amount),
 		}
 	}
 }
