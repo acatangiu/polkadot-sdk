@@ -32,14 +32,16 @@ pub enum SyncMode {
 		/// Download indexed transactions for recent blocks.
 		storage_chain_mode: bool,
 	},
-	/// Warp sync - verify authority set transitions and the latest state.
+	/// Warp sync - verify GRANDPA authority set transitions and the latest state.
 	Warp,
+	/// Warp sync using BEEFY finality proofs instead of GRANDPA justifications.
+	BeefyWarp,
 }
 
 impl SyncMode {
-	/// Returns `true` if `self` is [`Self::Warp`].
+	/// Returns `true` if `self` is a warp sync variant ([`Self::Warp`] or [`Self::BeefyWarp`]).
 	pub fn is_warp(&self) -> bool {
-		matches!(self, Self::Warp)
+		matches!(self, Self::Warp | Self::BeefyWarp)
 	}
 
 	/// Returns `true` if `self` is [`Self::LightState`].

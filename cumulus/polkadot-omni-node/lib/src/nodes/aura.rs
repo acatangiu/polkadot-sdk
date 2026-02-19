@@ -247,6 +247,7 @@ where
 				net_config,
 				block_announce_validator_builder: None,
 				warp_sync_config: None,
+				beefy_warp_sync_provider: None,
 				block_relay: None,
 				metrics: NotificationMetrics::new(None),
 			})?;

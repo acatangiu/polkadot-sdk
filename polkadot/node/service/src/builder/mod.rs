@@ -479,6 +479,7 @@ where
 				import_queue,
 				block_announce_validator_builder: None,
 				warp_sync_config: Some(WarpSyncConfig::WithProvider(warp_sync)),
+				beefy_warp_sync_provider: None,
 				block_relay: None,
 				metrics,
 			})?;

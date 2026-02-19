@@ -23,7 +23,7 @@
 use polkadot_sdk::{
 	sc_consensus_beefy as beefy, sc_consensus_grandpa as grandpa,
 	sp_consensus_babe::inherents::BabeCreateInherentDataProviders,
-	sp_consensus_beefy as beefy_primitives, *,
+	sp_consensus_beefy as beefy_primitives, sp_consensus_beefy::BeefyApi, *,
 };
 
 use crate::Cli;
@@ -36,7 +36,8 @@ use node_primitives::Block;
 use sc_client_api::{Backend, BlockBackend};
 use sc_consensus_babe::{self, SlotProportion};
 use sc_network::{
-	event::Event, service::traits::NetworkService, NetworkBackend, NetworkEventStream,
+	config::SyncMode, event::Event, service::traits::NetworkService, NetworkBackend,
+	NetworkEventStream,
 };
 use sc_network_sync::{strategy::warp::WarpSyncConfig, SyncingService};
 use sc_service::{config::Configuration, error::Error as ServiceError, RpcHandlers, TaskManager};
@@ -524,11 +525,29 @@ pub fn new_full_base<N: NetworkBackend<Block, <Block as BlockT>::Hash>>(
 		notification_service
 	});
 
-	let warp_sync = Arc::new(grandpa::warp_proof::NetworkProvider::new(
+	let grandpa_warp_sync = Arc::new(grandpa::warp_proof::NetworkProvider::new(
 		backend.clone(),
 		import_setup.1.shared_authority_set().clone(),
 		Vec::default(),
 	));
+
+	let genesis_beefy_validator_set = client
+		.runtime_api()
+		.validator_set(genesis_hash)
+		.ok()
+		.flatten()
+		.ok_or("Missing genesis BEEFY validator set")?;
+	let beefy_warp_sync = Arc::new(beefy::warp_proof::NetworkProvider::<
+		Block,
+		FullBackend,
+		beefy_primitives::ecdsa_crypto::AuthorityId,
+	>::new(backend.clone(), genesis_beefy_validator_set));
+
+	let warp_sync_config = match config.network.sync_mode {
+		SyncMode::Warp => Some(WarpSyncConfig::WithProvider(grandpa_warp_sync)),
+		SyncMode::BeefyWarp => Some(WarpSyncConfig::WithProvider(beefy_warp_sync.clone())),
+		_ => None,
+	};
 
 	let (network, system_rpc_tx, tx_handler_controller, sync_service) =
 		sc_service::build_network(sc_service::BuildNetworkParams {
@@ -540,7 +559,8 @@ pub fn new_full_base<N: NetworkBackend<Block, <Block as BlockT>::Hash>>(
 			spawn_essential_handle: task_manager.spawn_essential_handle(),
 			import_queue,
 			block_announce_validator_builder: None,
-			warp_sync_config: Some(WarpSyncConfig::WithProvider(warp_sync)),
+			warp_sync_config,
+			beefy_warp_sync_provider: Some(beefy_warp_sync),
 			block_relay: None,
 			metrics,
 		})?;

@@ -298,6 +298,10 @@ pub enum SyncMode {
 	/// blocks (unless `blocks-pruning` is set to archive mode). This saves bandwidth while still
 	/// allowing the node to serve as a warp sync source for other nodes.
 	Warp,
+	/// Prove finality using BEEFY finality proofs and download the latest state.
+	/// Requires the chain to run BEEFY. Uses the `/<genesis_hash>/sync/warp/beefy/ecdsa`
+	/// protocol instead of the standard GRANDPA warp sync protocol.
+	BeefyWarp,
 }
 
 impl Into<sc_network::config::SyncMode> for SyncMode {
@@ -313,6 +317,7 @@ impl Into<sc_network::config::SyncMode> for SyncMode {
 				storage_chain_mode: false,
 			},
 			SyncMode::Warp => sc_network::config::SyncMode::Warp,
+			SyncMode::BeefyWarp => sc_network::config::SyncMode::BeefyWarp,
 		}
 	}
 }

@@ -63,6 +63,7 @@ use sc_network_sync::{
 		polkadot::{PolkadotSyncingStrategy, PolkadotSyncingStrategyConfig},
 		SyncingStrategy,
 	},
+	strategy::warp::WarpSyncProvider,
 	warp_request_handler::RequestHandler as WarpSyncRequestHandler,
 	SyncingService, WarpSyncConfig,
 };
@@ -981,6 +982,13 @@ where
 	>,
 	/// Optional warp sync config.
 	pub warp_sync_config: Option<WarpSyncConfig<Block>>,
+	/// Optional BEEFY warp sync provider.
+	///
+	/// When provided, the node will also serve the `/<genesis_hash>/sync/warp/beefy/ecdsa`
+	/// protocol so that peers can warp sync using BEEFY finality proofs. This is independent of
+	/// `warp_sync_config`: a node can serve BEEFY warp proofs while itself syncing via GRANDPA
+	/// warp, and vice versa.
+	pub beefy_warp_sync_provider: Option<Arc<dyn WarpSyncProvider<Block>>>,
 	/// User specified block relay params. If not specified, the default
 	/// block request handler will be used.
 	pub block_relay: Option<BlockRelayParams<Block, Net>>,
@@ -1025,6 +1033,7 @@ where
 		import_queue,
 		block_announce_validator_builder,
 		warp_sync_config,
+		beefy_warp_sync_provider,
 		block_relay,
 		metrics,
 	} = params;
@@ -1069,6 +1078,7 @@ where
 		fork_id,
 		&mut net_config,
 		warp_sync_config,
+		beefy_warp_sync_provider,
 		block_downloader,
 		client.clone(),
 		&spawn_handle,
@@ -1402,6 +1412,7 @@ where
 		fork_id,
 		net_config,
 		warp_sync_config,
+		None,
 		block_downloader,
 		client.clone(),
 		spawn_handle,
@@ -1470,6 +1481,7 @@ pub fn build_polkadot_syncing_strategy<Block, Client, Net>(
 	fork_id: Option<&str>,
 	net_config: &mut FullNetworkConfiguration<Block, <Block as BlockT>::Hash, Net>,
 	warp_sync_config: Option<WarpSyncConfig<Block>>,
+	beefy_warp_sync_provider: Option<Arc<dyn WarpSyncProvider<Block>>>,
 	block_downloader: Arc<dyn BlockDownloader<Block>>,
 	client: Arc<Client>,
 	spawn_handle: &SpawnTaskHandle,
@@ -1496,7 +1508,8 @@ where
 			SyncMode::LightState { .. } => {
 				return Err("Fast sync doesn't work for archive nodes".into())
 			},
-			SyncMode::Warp => return Err("Warp sync doesn't work for archive nodes".into()),
+			SyncMode::Warp | SyncMode::BeefyWarp =>
+				return Err("Warp sync doesn't work for archive nodes".into()),
 			SyncMode::Full => {},
 		}
 	}
@@ -1516,25 +1529,65 @@ where
 	};
 	net_config.add_request_response_protocol(state_request_protocol_config);
 
-	let (warp_sync_protocol_config, warp_sync_protocol_name) = match warp_sync_config.as_ref() {
-		Some(WarpSyncConfig::WithProvider(warp_with_provider)) => {
-			// Allow both outgoing and incoming requests.
-			let (handler, protocol_config) = WarpSyncRequestHandler::new::<_, Net>(
-				protocol_id,
-				genesis_hash,
-				fork_id,
-				warp_with_provider.clone(),
-			);
-			let config_name = protocol_config.protocol_name().clone();
+	// Register the GRANDPA warp sync request handler only when the local node syncs via GRANDPA
+	// warp (mode == Warp). In BeefyWarp mode the `warp_sync_config` carries the BEEFY provider,
+	// which must not be served under the GRANDPA protocol name.
+	let grandpa_warp_protocol_name =
+		if !matches!(net_config.network_config.sync_mode, SyncMode::BeefyWarp) {
+			match warp_sync_config.as_ref() {
+				Some(WarpSyncConfig::WithProvider(warp_with_provider)) => {
+					// Allow both outgoing and incoming requests.
+					let (handler, protocol_config) = WarpSyncRequestHandler::new::<_, Net>(
+						protocol_id.clone(),
+						genesis_hash,
+						fork_id,
+						warp_with_provider.clone(),
+					);
+					let config_name = protocol_config.protocol_name().clone();
+					spawn_handle.spawn(
+						"warp-sync-request-handler",
+						Some("networking"),
+						handler.run(),
+					);
+					net_config.add_request_response_protocol(protocol_config);
+					Some(config_name)
+				},
+				_ => None,
+			}
+		} else {
+			None
+		};
 
-			spawn_handle.spawn("warp-sync-request-handler", Some("networking"), handler.run());
-			(Some(protocol_config), Some(config_name))
-		},
-		_ => (None, None),
-	};
-	if let Some(config) = warp_sync_protocol_config {
+	// Register the BEEFY warp sync request handler so that peers can warp sync using BEEFY
+	// finality proofs. When the local node is in BeefyWarp mode this also provides the
+	// protocol name that `WarpSync` uses to make outgoing proof requests.
+	let beefy_warp_protocol_name = if let Some(beefy_provider) = beefy_warp_sync_provider {
+		let (handler, config) = WarpSyncRequestHandler::new_with_suffix::<_, Net>(
+			protocol_id.clone(),
+			genesis_hash,
+			fork_id,
+			"sync/warp/beefy/ecdsa",
+			beefy_provider,
+		);
+		let name = config.protocol_name().clone();
+		spawn_handle.spawn(
+			"beefy-warp-sync-request-handler",
+			Some("networking"),
+			handler.run(),
+		);
 		net_config.add_request_response_protocol(config);
-	}
+		Some(name)
+	} else {
+		None
+	};
+
+	// The protocol name used for outgoing warp proof requests depends on the sync mode.
+	let warp_sync_protocol_name =
+		if matches!(net_config.network_config.sync_mode, SyncMode::BeefyWarp) {
+			beefy_warp_protocol_name
+		} else {
+			grandpa_warp_protocol_name
+		};
 
 	let syncing_config = PolkadotSyncingStrategyConfig {
 		mode: net_config.network_config.sync_mode,

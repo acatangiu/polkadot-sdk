@@ -138,6 +138,7 @@ pub fn new_full<Network: sc_network::NetworkBackend<Block, <Block as BlockT>::Ha
 			import_queue,
 			block_announce_validator_builder: None,
 			warp_sync_config: None,
+			beefy_warp_sync_provider: None,
 			block_relay: None,
 			metrics,
 		})?;

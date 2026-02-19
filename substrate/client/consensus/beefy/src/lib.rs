@@ -67,6 +67,7 @@ mod worker;
 pub mod communication;
 pub mod import;
 pub mod justification;
+pub mod warp_proof;
 
 use crate::{
 	communication::gossip::GossipValidator,

@@ -49,9 +49,42 @@ pub fn generate_request_response_config<
 	fork_id: Option<&str>,
 	inbound_queue: async_channel::Sender<IncomingRequest>,
 ) -> N::RequestResponseProtocolConfig {
+	generate_request_response_config_with_suffix::<Hash, B, N>(
+		protocol_id,
+		genesis_hash,
+		fork_id,
+		"sync/warp",
+		None,
+		inbound_queue,
+	)
+}
+
+/// Generates a `RequestResponseProtocolConfig` with a custom protocol name suffix and no legacy
+/// fallback name.
+pub fn generate_request_response_config_with_suffix<
+	Hash: AsRef<[u8]>,
+	B: BlockT,
+	N: NetworkBackend<B, <B as BlockT>::Hash>,
+>(
+	protocol_id: ProtocolId,
+	genesis_hash: Hash,
+	fork_id: Option<&str>,
+	suffix: &str,
+	legacy_suffix: Option<&str>,
+	inbound_queue: async_channel::Sender<IncomingRequest>,
+) -> N::RequestResponseProtocolConfig {
+	let protocol_name = generate_protocol_name_with_suffix(&genesis_hash, fork_id, suffix);
+	let fallback_names = legacy_suffix
+		.map(|s| {
+			std::iter::once(
+				format!("/{}/{}", protocol_id.as_ref(), s).into(),
+			)
+			.collect()
+		})
+		.unwrap_or_default();
 	N::request_response_config(
-		generate_protocol_name(genesis_hash, fork_id).into(),
-		std::iter::once(generate_legacy_protocol_name(protocol_id).into()).collect(),
+		protocol_name.into(),
+		fallback_names,
 		32,
 		MAX_RESPONSE_SIZE,
 		Duration::from_secs(10),
@@ -59,19 +92,18 @@ pub fn generate_request_response_config<
 	)
 }
 
-/// Generate the grandpa warp sync protocol name from the genesis hash and fork id.
-fn generate_protocol_name<Hash: AsRef<[u8]>>(genesis_hash: Hash, fork_id: Option<&str>) -> String {
+/// Generate a warp sync protocol name with a custom suffix from the genesis hash and fork id.
+fn generate_protocol_name_with_suffix<Hash: AsRef<[u8]>>(
+	genesis_hash: &Hash,
+	fork_id: Option<&str>,
+	suffix: &str,
+) -> String {
 	let genesis_hash = genesis_hash.as_ref();
 	if let Some(fork_id) = fork_id {
-		format!("/{}/{}/sync/warp", array_bytes::bytes2hex("", genesis_hash), fork_id)
+		format!("/{}/{}/{}", array_bytes::bytes2hex("", genesis_hash), fork_id, suffix)
 	} else {
-		format!("/{}/sync/warp", array_bytes::bytes2hex("", genesis_hash))
+		format!("/{}/{}", array_bytes::bytes2hex("", genesis_hash), suffix)
 	}
-}
-
-/// Generate the legacy grandpa warp sync protocol name from chain specific protocol identifier.
-fn generate_legacy_protocol_name(protocol_id: ProtocolId) -> String {
-	format!("/{}/sync/warp", protocol_id.as_ref())
 }
 
 /// Handler for incoming grandpa warp sync requests from a remote peer.
@@ -81,7 +113,8 @@ pub struct RequestHandler<TBlock: BlockT> {
 }
 
 impl<TBlock: BlockT> RequestHandler<TBlock> {
-	/// Create a new [`RequestHandler`].
+	/// Create a new [`RequestHandler`] for the standard grandpa warp sync protocol
+	/// (`/<genesis_hash>/sync/warp`).
 	pub fn new<Hash: AsRef<[u8]>, N: NetworkBackend<TBlock, <TBlock as BlockT>::Hash>>(
 		protocol_id: ProtocolId,
 		genesis_hash: Hash,
@@ -96,6 +129,33 @@ impl<TBlock: BlockT> RequestHandler<TBlock> {
 			fork_id,
 			tx,
 		);
+
+		(Self { backend, request_receiver }, request_response_config)
+	}
+
+	/// Create a new [`RequestHandler`] with a custom protocol name suffix.
+	///
+	/// Use this when registering alternative warp sync protocols (e.g. BEEFY warp sync at
+	/// `/<genesis_hash>/sync/warp/beefy/ecdsa`).
+	pub fn new_with_suffix<Hash: AsRef<[u8]>, N: NetworkBackend<TBlock, <TBlock as BlockT>::Hash>>(
+		protocol_id: ProtocolId,
+		genesis_hash: Hash,
+		fork_id: Option<&str>,
+		// Protocol path suffix, e.g. `"sync/warp/beefy/ecdsa"`.
+		suffix: &str,
+		backend: Arc<dyn WarpSyncProvider<TBlock>>,
+	) -> (Self, N::RequestResponseProtocolConfig) {
+		let (tx, request_receiver) = async_channel::bounded(MAX_WARP_REQUEST_QUEUE);
+
+		let request_response_config =
+			generate_request_response_config_with_suffix::<_, TBlock, N>(
+				protocol_id,
+				genesis_hash,
+				fork_id,
+				suffix,
+				None,
+				tx,
+			);
 
 		(Self { backend, request_receiver }, request_response_config)
 	}

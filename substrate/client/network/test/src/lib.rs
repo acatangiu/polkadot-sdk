@@ -814,7 +814,7 @@ pub trait TestNetFactory: Default + Sized + Send {
 		}
 
 		if !config.force_genesis &&
-			matches!(config.sync_mode, SyncMode::LightState { .. } | SyncMode::Warp)
+			matches!(config.sync_mode, SyncMode::LightState { .. } | SyncMode::Warp | SyncMode::BeefyWarp)
 		{
 			test_client_builder = test_client_builder.set_no_genesis();
 		}
