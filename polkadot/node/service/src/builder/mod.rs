@@ -51,12 +51,14 @@ use polkadot_overseer::{Handle, OverseerConnector};
 use polkadot_primitives::Block;
 use sc_client_api::Backend;
 use sc_network::config::FullNetworkConfiguration;
+use sc_network::config::SyncMode;
 use sc_network_sync::WarpSyncConfig;
 use sc_service::{Configuration, RpcHandlers, TaskManager};
 use sc_sysinfo::Metric;
 use sc_telemetry::TelemetryWorkerHandle;
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
-use sp_consensus_beefy::ecdsa_crypto;
+use sp_api::ProvideRuntimeApi;
+use sp_consensus_beefy::{ecdsa_crypto, BeefyApi};
 use sp_runtime::traits::Block as BlockT;
 use std::{
 	collections::{HashMap, HashSet},
@@ -378,6 +380,41 @@ where
 			grandpa_hard_forks,
 		));
 
+		// Build the BEEFY warp sync provider. This is served on all nodes (regardless of their
+		// own sync mode) so that peers running `--sync beefy-warp` can request BEEFY finality
+		// proofs. `validator_set(genesis_hash)` returns the initial BEEFY authority set; it may
+		// be `None` on chains where BEEFY was activated after genesis (e.g. via governance), in
+		// which case the BEEFY warp protocol is not registered.
+		let beefy_warp_sync_provider: Option<
+			Arc<dyn sc_network_sync::strategy::warp::WarpSyncProvider<Block>>,
+		> = client
+			.runtime_api()
+			.validator_set(genesis_hash)
+			.ok()
+			.flatten()
+			.map(|genesis_validator_set| {
+				Arc::new(sc_consensus_beefy::warp_proof::NetworkProvider::<
+					Block,
+					FullBackend,
+					ecdsa_crypto::AuthorityId,
+				>::new(backend.clone(), genesis_validator_set))
+					as Arc<dyn sc_network_sync::strategy::warp::WarpSyncProvider<Block>>
+			});
+
+		let warp_sync_config = match config.network.sync_mode {
+			SyncMode::BeefyWarp => beefy_warp_sync_provider
+				.as_ref()
+				.map(|p| WarpSyncConfig::WithProvider(p.clone()))
+				.or_else(|| {
+					log::warn!(
+						"--sync beefy-warp requested but BEEFY genesis validator set is \
+						 unavailable; falling back to GRANDPA warp sync"
+					);
+					Some(WarpSyncConfig::WithProvider(warp_sync))
+				}),
+			_ => Some(WarpSyncConfig::WithProvider(warp_sync)),
+		};
+
 		let ext_overseer_args = if is_parachain_node.is_running_alongside_parachain_node() {
 			None
 		} else {
@@ -478,8 +515,8 @@ where
 				spawn_essential_handle: task_manager.spawn_essential_handle(),
 				import_queue,
 				block_announce_validator_builder: None,
-				warp_sync_config: Some(WarpSyncConfig::WithProvider(warp_sync)),
-				beefy_warp_sync_provider: None,
+				warp_sync_config,
+				beefy_warp_sync_provider,
 				block_relay: None,
 				metrics,
 			})?;

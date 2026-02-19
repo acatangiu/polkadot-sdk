@@ -97,7 +97,6 @@ pub(crate) async fn build_network_config(
 				.with_validator(|node| {
 					node.with_name("dave").with_args(vec![
 						("-lparachain=debug,sync=trace").into(),
-						("--no-beefy").into(),
 						("--reserved-only").into(),
 						(
 							"--reserved-nodes",
@@ -108,15 +107,14 @@ pub(crate) async fn build_network_config(
 							],
 						)
 							.into(),
-						("--sync", "warp").into(),
+						("--sync", "beefy-warp").into(),
 						("--blocks-pruning", "256").into(),
 					])
 				})
 				.with_fullnode(|node| {
 					node.with_name("eve").with_args(vec![
 						("-lparachain=debug,sync=trace").into(),
-						("--no-beefy").into(),
-						("--sync", "warp").into(),
+						("--sync", "beefy-warp").into(),
 					])
 				})
 		})
